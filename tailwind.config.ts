@@ -53,8 +53,6 @@ export default {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
-        'offer-yellow': '#FACC15', // a nice yellow
-        'offer-red': '#DC2626',    // a strong red
         chart: {
           '1': 'hsl(var(--chart-1))',
           '2': 'hsl(var(--chart-2))',

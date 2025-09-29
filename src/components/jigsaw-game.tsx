@@ -1,20 +1,14 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import Link from 'next/link';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -29,7 +23,6 @@ import { useTimer } from '@/hooks/use-timer';
 import { useBestTime } from '@/hooks/use-best-time';
 import ShareButton from './share-button';
 import { recordGameCompletion } from '@/app/dashboard/actions';
-import type { GameActionsHandle } from './dynamic-puzzle-game';
 
 const motivationalMessages = [
     "You're a puzzle-solving superhero!",
@@ -37,8 +30,6 @@ const motivationalMessages = [
     "You've conquered the challenge like a true champion!",
     "Brilliant! You've got the mind of a genius!",
 ];
-
-const DIFFICULTY_LEVELS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 type Piece = {
     id: number;
@@ -56,20 +47,10 @@ type JigsawGameProps = {
     onStatsChange?: (stats: { moves: number; time: string }) => void;
     slug?: string;
     imageFilename?: string;
-    gridSizeFromHome?: number;
-    onGameStateChange?: (state: GameState) => void;
 };
 
-const JigsawGame = forwardRef<GameActionsHandle, JigsawGameProps>(({ 
-    imageSrcFromHome, 
-    isPreviewVisibleFromHome, 
-    onStatsChange, 
-    slug, 
-    imageFilename,
-    gridSizeFromHome,
-    onGameStateChange,
- }, ref) => {
-    const [gridSize, setGridSize] = useState(gridSizeFromHome || 4);
+export default function JigsawGame({ imageSrcFromHome, isPreviewVisibleFromHome, onStatsChange, slug, imageFilename }: JigsawGameProps) {
+    const [gridSize, setGridSize] = useState(4);
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [pieces, setPieces] = useState<Piece[]>([]);
     const [moves, setMoves] = useState(0);
@@ -93,24 +74,17 @@ const JigsawGame = forwardRef<GameActionsHandle, JigsawGameProps>(({
     const previewRef = useRef<HTMLDivElement>(null);
     const dragOffsetRef = useRef({ x: 0, y: 0 });
     const resizeStartRef = useRef({ x: 0, startWidth: 0 });
+    const [isClient, setIsClient] = useState(false);
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
 
     useEffect(() => {
         if (onStatsChange) {
             onStatsChange({ moves, time });
         }
     }, [moves, time, onStatsChange]);
-    
-    useEffect(() => {
-        if(onGameStateChange) {
-            onGameStateChange(gameState);
-        }
-    }, [gameState, onGameStateChange]);
-    
-     useEffect(() => {
-        if (gridSizeFromHome !== undefined) {
-            setGridSize(gridSizeFromHome);
-        }
-    }, [gridSizeFromHome]);
 
     useEffect(() => {
         if (isPreviewVisibleFromHome !== undefined) {
@@ -227,32 +201,15 @@ const JigsawGame = forwardRef<GameActionsHandle, JigsawGameProps>(({
         }
     };
     
-    const startGame = useCallback(() => {
+    const startGame = () => {
         createPuzzle(true);
-    }, [createPuzzle]);
+    };
 
-    const stopGame = useCallback(() => {
+    const stopGame = () => {
         stopTimer();
         setGameState('ready');
         createPuzzle(false);
-    }, [stopTimer, createPuzzle]);
-    
-     const handlePause = useCallback(() => {
-        if (gameState === 'playing') {
-            pauseTimer();
-            setGameState('paused');
-        } else if (gameState === 'paused') {
-            startTimer();
-            setGameState('playing');
-        }
-    }, [gameState, pauseTimer, startTimer]);
-    
-    useImperativeHandle(ref, () => ({
-        start: startGame,
-        stop: stopGame,
-        pause: handlePause,
-        restart: () => createPuzzle(true),
-    }));
+    };
     
     useEffect(() => {
         if (imageSrcFromHome) {
@@ -283,61 +240,49 @@ const JigsawGame = forwardRef<GameActionsHandle, JigsawGameProps>(({
     }, [imageSrc, imageSize.width, gameState, createPuzzle]);
 
 
-    const handleDragStart = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>, pieceId: number) => {
+
+    const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>, pieceId: number) => {
         if (gameState !== 'playing') return;
         const piece = pieces.find(p => p.id === pieceId);
         if (!piece || piece.isPlaced) return;
 
-        e.preventDefault();
         const pieceElement = e.currentTarget;
         const rect = pieceElement.getBoundingClientRect();
         
-        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-
         draggingPieceRef.current = {
             pieceId,
             element: pieceElement,
-            offsetX: clientX - rect.left,
-            offsetY: clientY - rect.top,
+            offsetX: e.clientX - rect.left,
+            offsetY: e.clientY - rect.top,
         };
         pieceElement.style.zIndex = '1000';
         pieceElement.style.cursor = 'grabbing';
         pieceElement.style.transition = 'none';
     };
 
-
-    const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
+    const handleMouseMove = useCallback((e: MouseEvent) => {
         if (gameState !== 'playing' || !draggingPieceRef.current || !puzzleContainerRef.current) return;
     
-        e.preventDefault();
         const { element, offsetX, offsetY } = draggingPieceRef.current;
         const containerRect = puzzleContainerRef.current.getBoundingClientRect();
-        
-        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     
-        const newX = clientX - containerRect.left - offsetX;
-        const newY = clientY - containerRect.top - offsetY;
+        const newX = e.clientX - containerRect.left - offsetX;
+        const newY = e.clientY - containerRect.top - offsetY;
 
         element.style.transform = `translate(${newX}px, ${newY}px)`;
     }, [gameState]);
 
-    const handleDragEnd = useCallback((e: MouseEvent | TouchEvent) => {
+    const handleMouseUp = useCallback((e: MouseEvent) => {
         if (gameState !== 'playing' || !draggingPieceRef.current || !puzzleContainerRef.current) return;
-        
-        e.preventDefault();
+
         const { pieceId, element } = draggingPieceRef.current;
         
         const piece = pieces.find(p => p.id === pieceId);
         if (!piece) return;
 
-        const clientX = 'changedTouches' in e ? e.changedTouches[0].clientX : e.clientX;
-        const clientY = 'changedTouches' in e ? e.changedTouches[0].clientY : e.clientY;
-
         const containerRect = puzzleContainerRef.current.getBoundingClientRect();
-        const finalX = clientX - containerRect.left - draggingPieceRef.current.offsetX;
-        const finalY = clientY - containerRect.top - draggingPieceRef.current.offsetY;
+        const finalX = e.clientX - containerRect.left - draggingPieceRef.current.offsetX;
+        const finalY = e.clientY - containerRect.top - draggingPieceRef.current.offsetY;
 
 
         const pieceWidth = puzzleDimension.width / gridSize;
@@ -377,18 +322,14 @@ const JigsawGame = forwardRef<GameActionsHandle, JigsawGameProps>(({
 
 
     useEffect(() => {
-        document.addEventListener('mousemove', handleDragMove);
-        document.addEventListener('mouseup', handleDragEnd);
-        document.addEventListener('touchmove', handleDragMove, { passive: false });
-        document.addEventListener('touchend', handleDragEnd, { passive: false });
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
 
         return () => {
-            document.removeEventListener('mousemove', handleDragMove);
-            document.removeEventListener('mouseup', handleDragEnd);
-            document.removeEventListener('touchmove', handleDragMove);
-            document.removeEventListener('touchend', handleDragEnd);
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [handleDragMove, handleDragEnd]);
+    }, [handleMouseMove, handleMouseUp]);
 
 
     useEffect(() => {
@@ -410,54 +351,53 @@ const JigsawGame = forwardRef<GameActionsHandle, JigsawGameProps>(({
         }
     }, [pieces, stopTimer, updateBestTime, timeInSeconds, gameState, slug, gridSize, moves]);
     
-   
+    const handlePause = () => {
+        if (gameState === 'playing') {
+            pauseTimer();
+            setGameState('paused');
+        } else if (gameState === 'paused') {
+            startTimer();
+            setGameState('playing');
+        }
+    };
     
     const handleDialogClose = () => {
         setGameState('ready');
         createPuzzle(false);
     }
 
-    const handlePreviewMouseDown = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-        if (!previewRef.current || isResizingPreview) return;
-        
-        e.preventDefault(); // Prevent text selection etc.
-        setIsDraggingPreview(true);
-        
-        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
+    const handlePreviewMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!previewRef.current || isResizingPreview) return;
+        setIsDraggingPreview(true);
         const rect = previewRef.current.getBoundingClientRect();
         dragOffsetRef.current = {
-            x: clientX - rect.left,
-            y: clientY - rect.top,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
         };
         previewRef.current.style.transition = 'none';
+        e.preventDefault();
     };
 
-    const handlePreviewResizeMouseDown = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    const handlePreviewResizeMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
         e.stopPropagation();
-        e.preventDefault();
         setIsResizingPreview(true);
-        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
         resizeStartRef.current = {
-            x: clientX,
+            x: e.clientX,
             startWidth: previewRef.current?.offsetWidth || previewSize.width,
         };
+        e.preventDefault();
     };
 
-    const handlePreviewMouseMove = useCallback((e: MouseEvent | TouchEvent) => {
+    const handlePreviewMouseMove = useCallback((e: MouseEvent) => {
         if (!previewRef.current) return;
-        
-        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-        
         if (isDraggingPreview && puzzleContainerRef.current) {
             const parentRect = puzzleContainerRef.current.getBoundingClientRect();
-            previewRef.current.style.left = `${clientX - parentRect.left - dragOffsetRef.current.x}px`;
-            previewRef.current.style.top = `${clientY - parentRect.top - dragOffsetRef.current.y}px`;
+            previewRef.current.style.left = `${e.clientX - parentRect.left - dragOffsetRef.current.x}px`;
+            previewRef.current.style.top = `${e.clientY - parentRect.top - dragOffsetRef.current.y}px`;
 
         } else if (isResizingPreview) {
-            const dx = clientX - resizeStartRef.current.x;
+            const dx = e.clientX - resizeStartRef.current.x;
             const newWidth = resizeStartRef.current.startWidth + dx;
             previewRef.current.style.width = `${Math.max(100, newWidth)}px`;
         }
@@ -485,26 +425,23 @@ const JigsawGame = forwardRef<GameActionsHandle, JigsawGameProps>(({
     useEffect(() => {
         document.addEventListener('mousemove', handlePreviewMouseMove);
         document.addEventListener('mouseup', handlePreviewMouseUp);
-        document.addEventListener('touchmove', handlePreviewMouseMove);
-        document.addEventListener('touchend', handlePreviewMouseUp);
         return () => {
             document.removeEventListener('mousemove', handlePreviewMouseMove);
             document.removeEventListener('mouseup', handlePreviewMouseUp);
-            document.removeEventListener('touchmove', handlePreviewMouseMove);
-            document.removeEventListener('touchend', handlePreviewMouseUp);
         };
     }, [handlePreviewMouseMove, handlePreviewMouseUp]);
     
     const showControls = !imageSrcFromHome;
 
     return (
-        <div className="w-full h-full flex flex-col items-center justify-center p-4">
-            <div className="w-full flex-grow flex flex-col lg:flex-row gap-8">
+        <div className="w-full h-full flex flex-col items-center justify-center">
+             {isClient &&
+            <div className="w-full flex-grow flex flex-col lg:flex-row gap-8 lg:p-8">
                 {showControls && (
                     <Card className="w-full lg:w-[380px] lg:flex-shrink-0">
                         <CardHeader>
-                            <CardTitle>Jigsaw Puzzle</CardTitle>
-                            <CardDescription>Upload an image and start solving</CardDescription>
+                            <CardTitle>Controls</CardTitle>
+                            <CardDescription>Set up your puzzle</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="space-y-2">
@@ -531,17 +468,23 @@ const JigsawGame = forwardRef<GameActionsHandle, JigsawGameProps>(({
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="grid-size" className="font-semibold">Difficulty</Label>
-                                <Select value={String(gridSize)} onValueChange={(value) => setGridSize(Number(value))} disabled={gameState === 'playing' || gameState === 'paused'}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select difficulty" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {DIFFICULTY_LEVELS.map(size => (
-                                            <SelectItem key={size} value={String(size)}>{size} x {size}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                            <Label htmlFor="grid-size" className="font-semibold">Difficulty</Label>
+                            <div className='text-center text-lg font-medium tracking-wide'>{gridSize} x {gridSize}</div>
+                            <Slider
+                                id="grid-size"
+                                min={2}
+                                max={12}
+                                step={1}
+                                value={[gridSize]}
+                                onValueChange={(value) => {
+                                    setGridSize(value[0]);
+                                    if (imageSrc) {
+                                        setGameState('ready');
+                                        setPieces([]);
+                                    }
+                                }}
+                                disabled={gameState === 'playing' || gameState === 'paused'}
+                            />
                             </div>
                              <div className="text-center">
                                 <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground"><Star className="text-amber-400" /> Best Time</div>
@@ -554,14 +497,15 @@ const JigsawGame = forwardRef<GameActionsHandle, JigsawGameProps>(({
                                         Start Game
                                     </Button>
                                 ) : (
-                                    <div className='w-full grid grid-cols-2 gap-2'>
+                                    <div className='w-full grid grid-cols-3 gap-2'>
                                         <Button onClick={handlePause} variant="outline" size="lg" aria-label={gameState === 'paused' ? "Resume game" : "Pause game"}>
                                             {gameState === 'paused' ? <Play /> : <Pause />}
-                                             <span className="ml-2">{gameState === 'paused' ? "Resume" : "Pause"}</span>
                                         </Button>
                                         <Button onClick={stopGame} variant="destructive" size="lg" aria-label="Stop game">
                                             <XCircle />
-                                            <span className="ml-2">Stop</span>
+                                        </Button>
+                                        <Button onClick={() => createPuzzle(true)} size="lg" variant="secondary" aria-label="Restart game">
+                                            <RotateCcw />
                                         </Button>
                                     </div>
                                 )}
@@ -572,7 +516,7 @@ const JigsawGame = forwardRef<GameActionsHandle, JigsawGameProps>(({
 
                 <div className="w-full flex-grow flex flex-col items-center justify-center">
                     <div 
-                        className="w-full flex-grow bg-muted/20 rounded-lg shadow-inner relative overflow-hidden touch-none"
+                        className="w-full flex-grow bg-muted/20 rounded-lg shadow-inner relative overflow-hidden"
                         ref={puzzleContainerRef}
                     >
                         {!imageSrc ? (
@@ -604,6 +548,40 @@ const JigsawGame = forwardRef<GameActionsHandle, JigsawGameProps>(({
                                         </Button>
                                     </div>
                                 }
+                                {imageSrcFromHome && 
+                                    <div className="absolute top-2 right-2 z-20 flex items-center gap-2">
+                                        {gameState === 'ready' || gameState === 'solved' || gameState === 'initial' ? (
+                                            <Button onClick={startGame} disabled={!imageSrc || gameState === 'playing'} size="lg">
+                                                <Play className="mr-2" />
+                                                Start
+                                            </Button>
+                                        ) : (
+                                            <>
+                                                <Button onClick={handlePause} variant="outline" size="icon" aria-label={gameState === 'paused' ? "Resume game" : "Pause game"}>
+                                                    {gameState === 'paused' ? <Play /> : <Pause />}
+                                                </Button>
+                                                <Button onClick={stopGame} variant="destructive" size="icon" aria-label="Stop game">
+                                                    <XCircle />
+                                                </Button>
+                                                <Button onClick={() => createPuzzle(true)} size="icon" variant="secondary" aria-label="Restart game">
+                                                    <RotateCcw />
+                                                </Button>
+                                            </>
+                                        )}
+                                        <div className="flex items-center gap-2 bg-background p-1 rounded-md">
+                                            <Label htmlFor="grid-size" className="font-semibold pr-2">Difficulty</Label>
+                                            <Slider
+                                                id="grid-size"
+                                                min={2} max={12} step={1}
+                                                className="w-32"
+                                                value={[gridSize]}
+                                                onValueChange={(value) => setGridSize(value[0])}
+                                                disabled={gameState === 'playing' || gameState === 'paused'}
+                                            />
+                                            <span className="font-bold w-12 text-center">{gridSize}x{gridSize}</span>
+                                        </div>
+                                    </div>
+                                }
                                 {/* Board outlines */}
                                 <div 
                                     className="absolute"
@@ -631,8 +609,7 @@ const JigsawGame = forwardRef<GameActionsHandle, JigsawGameProps>(({
                                     <div
                                         key={piece.id}
                                         data-piece-id={piece.id}
-                                        onMouseDown={(e) => handleDragStart(e, piece.id)}
-                                        onTouchStart={(e) => handleDragStart(e, piece.id)}
+                                        onMouseDown={(e) => handleMouseDown(e, piece.id)}
                                         className="absolute bg-no-repeat rounded-md shadow-lg"
                                         style={{
                                             width: puzzleDimension.width / gridSize,
@@ -657,8 +634,7 @@ const JigsawGame = forwardRef<GameActionsHandle, JigsawGameProps>(({
                                     <div
                                         ref={previewRef}
                                         onMouseDown={handlePreviewMouseDown}
-                                        onTouchStart={handlePreviewMouseDown}
-                                        className="absolute z-50 p-1 bg-background/80 backdrop-blur-sm rounded-md shadow-lg flex flex-col border touch-none"
+                                        className="absolute z-50 p-1 bg-background/80 backdrop-blur-sm rounded-md shadow-lg flex flex-col border"
                                         style={{
                                             left: `${previewPos.x}px`,
                                             top: `${previewPos.y}px`,
@@ -673,7 +649,6 @@ const JigsawGame = forwardRef<GameActionsHandle, JigsawGameProps>(({
                                         </div>
                                         <div 
                                             onMouseDown={handlePreviewResizeMouseDown}
-                                            onTouchStart={handlePreviewResizeMouseDown}
                                             className="absolute -bottom-1 -right-1 cursor-se-resize p-2"
                                         >
                                             <CornerDownRight className="w-4 h-4 text-muted-foreground" />
@@ -685,6 +660,7 @@ const JigsawGame = forwardRef<GameActionsHandle, JigsawGameProps>(({
                     </div>
                 </div>
             </div>
+          }
           <Dialog open={gameState === 'solved'} onOpenChange={(open) => !open && handleDialogClose()}>
                 <DialogContent>
                     <DialogHeader>
@@ -704,9 +680,6 @@ const JigsawGame = forwardRef<GameActionsHandle, JigsawGameProps>(({
                     )}
                     <DialogFooter className="sm:justify-center flex-col sm:flex-row gap-2">
                         <Button onClick={handleDialogClose} className="w-full sm:w-auto">Play Again</Button>
-                         <Button asChild variant="outline" className="w-full sm:w-auto">
-                           <Link href="/puzzles">More Puzzles</Link>
-                        </Button>
                         {slug && imageFilename && 
                           <ShareButton 
                             slug={slug}
@@ -724,6 +697,4 @@ const JigsawGame = forwardRef<GameActionsHandle, JigsawGameProps>(({
             </Dialog>
       </div>
   );
-});
-JigsawGame.displayName = "JigsawGame";
-export default JigsawGame;
+}

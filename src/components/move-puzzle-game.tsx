@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -41,7 +40,7 @@ type Piece = {
 
 type GameState = 'initial' | 'ready' | 'playing' | 'paused' | 'solved';
 
-type MovePuzzleGameProps = {
+type JigsawGameProps = {
     imageSrcFromHome?: string;
     isPreviewVisibleFromHome?: boolean;
     onStatsChange?: (stats: { moves: number; time: string }) => void;
@@ -49,7 +48,7 @@ type MovePuzzleGameProps = {
     imageFilename?: string;
 };
 
-export default function MovePuzzleGame({ imageSrcFromHome, isPreviewVisibleFromHome, onStatsChange, slug, imageFilename }: MovePuzzleGameProps) {
+export default function JigsawGame({ imageSrcFromHome, isPreviewVisibleFromHome, onStatsChange, slug, imageFilename }: JigsawGameProps) {
     const [gridSize, setGridSize] = useState(4);
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [pieces, setPieces] = useState<Piece[]>([]);
@@ -58,7 +57,7 @@ export default function MovePuzzleGame({ imageSrcFromHome, isPreviewVisibleFromH
     const [puzzleDimension, setPuzzleDimension] = useState({ width: 500, height: 500 });
     const [boardPositions, setBoardPositions] = useState<{ x: number; y: number }[]>([]);
     const { time, seconds: timeInSeconds, isActive, startTimer, pauseTimer, stopTimer, resetTimer } = useTimer();
-    const { bestTime, updateBestTime } = useBestTime('move', gridSize);
+    const { bestTime, updateBestTime } = useBestTime('jigsaw', gridSize);
     const [motivationalMessage, setMotivationalMessage] = useState("");
     const [gameState, setGameState] = useState<GameState>('initial');
     const [termsAgreed, setTermsAgreed] = useState(false);
@@ -342,7 +341,7 @@ export default function MovePuzzleGame({ imageSrcFromHome, isPreviewVisibleFromH
                 recordGameCompletion({
                     puzzleSlug: slug,
                     category: slug.split('/')[0],
-                    gameType: 'move',
+                    gameType: 'jigsaw',
                     difficulty: gridSize,
                     timeInSeconds: timeInSeconds,
                     moves: moves,

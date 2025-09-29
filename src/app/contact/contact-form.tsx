@@ -1,13 +1,13 @@
-
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { submitContactForm, type ContactFormState } from './actions';
 import { useToast } from '@/hooks/use-toast';
+import { useActionState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,18 +44,15 @@ export function ContactForm() {
   const { toast } = useToast();
   const [num1, setNum1] = useState(0);
   const [num2, setNum2] = useState(0);
-  const [isClient, setIsClient] = useState(false);
-  const [isSubmitting, startTransition] = useTransition();
-
-  useEffect(() => {
-    setIsClient(true);
-    generateCaptcha();
-  }, []);
 
   const generateCaptcha = () => {
     setNum1(Math.floor(Math.random() * 10) + 1);
     setNum2(Math.floor(Math.random() * 10) + 1);
   };
+
+  useEffect(() => {
+    generateCaptcha();
+  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema.refine(
@@ -75,33 +72,28 @@ export function ContactForm() {
     },
   });
 
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
-    startTransition(async () => {
-        const formData = new FormData();
-        Object.entries(data).forEach(([key, value]) => {
-            formData.append(key, value);
-        });
-        
-        const result = await submitContactForm({message: null, status: null}, formData);
+  const initialState: ContactFormState = { message: null, status: null };
+  const [state, formAction] = useActionState(submitContactForm, initialState);
 
+  useEffect(() => {
+    if (state.status) {
         toast({
-            title: result.status === 'success' ? 'Success!' : 'Error',
-            description: result.message,
-            variant: result.status === 'error' ? 'destructive' : 'default',
+            title: state.status === 'success' ? 'Success!' : 'Error',
+            description: state.message,
+            variant: state.status === 'error' ? 'destructive' : 'default',
         });
-
-        if (result.status === 'success') {
+        if (state.status === 'success') {
             form.reset();
         }
         generateCaptcha();
         form.resetField('captcha');
-    });
-  };
+    }
+  }, [state, toast, form]);
 
   return (
     <Form {...form}>
         <form
-            onSubmit={form.handleSubmit(onSubmit)}
+            action={formAction}
             className="grid gap-4"
         >
             <div className="grid grid-cols-2 gap-4">
@@ -176,30 +168,27 @@ export function ContactForm() {
                 </FormItem>
             )}
             />
-            {isClient && (
-                <FormField
-                control={form.control}
-                name="captcha"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>
-                        What is {num1} + {num2}?
-                    </FormLabel>
-                    <FormControl>
-                        <Input
-                        type="number"
-                        placeholder="Your answer"
-                        {...field}
-                        />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
+            <FormField
+            control={form.control}
+            name="captcha"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>
+                    What is {num1} + {num2}?
+                </FormLabel>
+                <FormControl>
+                    <Input
+                    type="number"
+                    placeholder="Your answer"
+                    {...field}
+                    />
+                </FormControl>
+                <FormMessage />
+                </FormItem>
             )}
-             <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? 'Submitting...' : 'Submit'}
-            </Button>
+            />
+
+            <SubmitButton />
         </form>
     </Form>
   );

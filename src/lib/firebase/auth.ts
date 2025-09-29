@@ -1,4 +1,3 @@
-
 // src/lib/firebase/auth.ts
 'use client';
 
@@ -16,15 +15,11 @@ import {
     updatePassword,
     reauthenticateWithCredential,
     EmailAuthProvider,
-    deleteUser,
-    type User
+    deleteUser
 } from 'firebase/auth';
 import { app } from './config';
-import { getFirestore, doc, setDoc, Timestamp } from 'firebase/firestore';
-import { getSiteSettings } from '@/app/super-admin/settings/actions';
 
 const auth = getAuth(app);
-const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
 export type AuthenticatedUser = {
@@ -39,41 +34,12 @@ type UserProfile = {
     lastName: string;
 }
 
-// Function to grant free monthly pro subscription
-const grantFreeProSubscription = async (user: User) => {
-    try {
-        const { offerEnabled } = await getSiteSettings();
-        if (!offerEnabled) return; // Only grant if the offer is active
-
-        const userRef = doc(db, 'users', user.uid);
-        const now = new Date();
-        const expiryDate = new Date(now.setMonth(now.getMonth() + 1));
-
-        await setDoc(userRef, {
-             proMembership: {
-                planId: 'monthly_pro',
-                grantedBy: 'signup_offer',
-                startedAt: Timestamp.now(),
-                expiresAt: Timestamp.fromDate(expiryDate),
-                status: 'active'
-            } 
-        }, { merge: true });
-        console.log(`Granted free monthly pro to ${user.uid}`);
-    } catch (error) {
-        console.error("Failed to grant free pro subscription:", error);
-    }
-}
-
 // Client-side functions
 export const signup = async (email: string, password: string, profile: UserProfile) => {
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   await updateProfile(userCredential.user, {
     displayName: `${profile.firstName} ${profile.lastName}`.trim(),
   });
-  
-  // Grant free pro if offer is active
-  await grantFreeProSubscription(userCredential.user);
-
   // We don't need to create a session here, as the user should verify their email first.
   // The user will log in after verification, which will create the session.
   await sendEmailVerification(userCredential.user);

@@ -2,27 +2,13 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Users, MessageSquare, Star, Tags, DollarSign, Settings, Puzzle, Gift } from "lucide-react";
+import { Users, MessageSquare, Star } from "lucide-react";
 
 export default function SuperAdminPage() {
     return (
         <div className="container mx-auto py-8 px-4">
             <h1 className="text-3xl font-bold mb-8">Super Admin Dashboard</h1>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>Manage Puzzles</CardTitle>
-                        <CardDescription>Upload puzzles and manage categories.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Button asChild>
-                            <Link href="/super-admin/puzzles">
-                                <Puzzle className="mr-2 h-4 w-4" />
-                                Go to Puzzles
-                            </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle>Manage Users</CardTitle>
@@ -65,60 +51,17 @@ export default function SuperAdminPage() {
                         </Button>
                     </CardContent>
                 </Card>
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>Manage Memberships</CardTitle>
-                        <CardDescription>Edit prices and offers for membership plans.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Button asChild>
-                            <Link href="/super-admin/membership">
-                                <Tags className="mr-2 h-4 w-4" />
-                                Edit Plans
-                            </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>Revenue</CardTitle>
-                        <CardDescription>View sales and revenue analytics.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Button asChild>
-                            <Link href="/super-admin/revenue">
-                                <DollarSign className="mr-2 h-4 w-4" />
-                                View Revenue
-                            </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
                 <Card>
                     <CardHeader>
-                        <CardTitle>Site Settings</CardTitle>
-                        <CardDescription>Manage global site settings and features.</CardDescription>
+                        <CardTitle>Coming Soon</CardTitle>
+                        <CardDescription>This is your control panel. More features are on the way!</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <Button asChild>
-                            <Link href="/super-admin/settings">
-                                <Settings className="mr-2 h-4 w-4" />
-                                Go to Settings
-                            </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>Manage Offers</CardTitle>
-                        <CardDescription>Control promotional offers on the homepage.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Button asChild>
-                            <Link href="/super-admin/offers">
-                                <Gift className="mr-2 h-4 w-4" />
-                                Go to Offers
-                            </Link>
-                        </Button>
+                        <p>Future features will include:</p>
+                        <ul className="list-disc pl-6 mt-4 space-y-2 text-muted-foreground">
+                            <li>User statistics (registrations, daily/monthly visits)</li>
+                            <li>Managing "Pro" puzzle templates</li>
+                        </ul>
                     </CardContent>
                 </Card>
             </div>

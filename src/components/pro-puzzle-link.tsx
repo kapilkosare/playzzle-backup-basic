@@ -1,12 +1,11 @@
 
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   AlertDialog,
   AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -14,11 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from './ui/button';
-import { Star, CheckCircle } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import type { AuthenticatedUser } from '@/lib/firebase/server-auth';
-import { useSinglePuzzleCredit } from '@/app/account/actions';
-import { useToast } from '@/hooks/use-toast';
+import { Star } from 'lucide-react';
 
 type PuzzleImage = {
   src: string;
@@ -30,79 +25,29 @@ type PuzzleImage = {
 type ProPuzzleLinkProps = {
   image: PuzzleImage;
   isSuperAdmin: boolean;
-  isProUser: boolean;
-  unlockedPuzzleIds?: string[];
   children: React.ReactNode;
-  user: AuthenticatedUser | null;
-  hasSinglePurchaseCredit?: boolean;
-  creditTransactionId?: string | null; // Changed to allow null
 };
 
-export default function ProPuzzleLink({ image, isSuperAdmin, isProUser, unlockedPuzzleIds = [], user, hasSinglePurchaseCredit, creditTransactionId, children }: ProPuzzleLinkProps) {
-  const [dialog, setDialog] = useState<'closed' | 'purchase' | 'use_credit'>('closed');
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const { toast } = useToast();
-
-  const isUnlocked = isSuperAdmin || isProUser || (unlockedPuzzleIds && unlockedPuzzleIds.includes(image.filename));
+export default function ProPuzzleLink({ image, isSuperAdmin, children }: ProPuzzleLinkProps) {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const handleClick = (e: React.MouseEvent) => {
-    e.preventDefault(); // Always prevent default to control flow
-    if (isUnlocked) {
-      router.push(`/play/${image.category}/${encodeURIComponent(image.filename)}`);
-      return;
-    }
-    
-    if (!user) {
-        router.push('/login');
-        return;
-    }
-
-    if (hasSinglePurchaseCredit && creditTransactionId) {
-      setDialog('use_credit');
-    } else {
-      setDialog('purchase');
+    if (image.isPro && !isSuperAdmin) {
+      e.preventDefault();
+      setIsDialogOpen(true);
     }
   };
-
-  const handleGoToMembership = () => {
-    router.push('/membership');
-  };
-
-  const handleUseCredit = () => {
-    startTransition(async () => {
-        if (!creditTransactionId) return;
-
-        const result = await useSinglePuzzleCredit(creditTransactionId, image.filename, image.category);
-        if (result.success) {
-            toast({
-                title: "Puzzle Unlocked!",
-                description: "This puzzle is now permanently available in your account.",
-            });
-            setDialog('closed');
-            router.refresh(); // Refresh to update user's unlocked puzzles
-        } else {
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: result.message,
-            });
-        }
-    });
-  }
 
   return (
     <>
-      <a
+      <Link
         href={`/play/${image.category}/${encodeURIComponent(image.filename)}`}
         onClick={handleClick}
-        className="cursor-pointer"
       >
         {children}
-      </a>
-      
-      {/* Dialog for users who need to buy a credit */}
-      <AlertDialog open={dialog === 'purchase'} onOpenChange={(open) => !open && setDialog('closed')}>
+      </Link>
+
+      <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -110,34 +55,16 @@ export default function ProPuzzleLink({ image, isSuperAdmin, isProUser, unlocked
                 Pro Puzzle
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This is a premium puzzle. To play, please purchase a 'Single Puzzle Credit' from the membership page. Once purchased, you can come back here to unlock it.
+              This is a premium puzzle exclusive for our pro members. Please upgrade your membership to play.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleGoToMembership}>
-                Go to Memberships
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-       {/* Dialog for users who have a credit */}
-      <AlertDialog open={dialog === 'use_credit'} onOpenChange={(open) => !open && setDialog('closed')}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-                <CheckCircle className="text-green-500" />
-                Use Your Puzzle Credit
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              You have a credit for one Pro puzzle. Would you like to use it to unlock this puzzle permanently?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-             <AlertDialogCancel onClick={() => setDialog('closed')} disabled={isPending}>Cancel</AlertDialogCancel>
-             <AlertDialogAction onClick={handleUseCredit} disabled={isPending}>
-                {isPending ? 'Unlocking...' : 'Unlock This Puzzle'}
+          <AlertDialogFooter>
+            {/* We can add a link to the membership page here in the future */}
+            {/* <AlertDialogAction asChild>
+                <Link href="/membership">Upgrade to Pro</Link>
+            </AlertDialogAction> */}
+            <AlertDialogAction onClick={() => setIsDialogOpen(false)}>
+              Got it
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

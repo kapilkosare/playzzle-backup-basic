@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
-import { useEffect, useState, useTransition } from 'react';
+import { useActionState, useEffect } from 'react';
+import { useFormStatus } from 'react-dom';
 
 import {
   AlertDialog,
@@ -17,6 +18,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
 import { Input } from '@/components/ui/input';
@@ -46,7 +48,7 @@ type AccountFormProps = {
 
 const profileFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().optional(),
+  lastName: z.string().min(1, "Last name is required"),
 });
 
 const passwordFormSchema = z.object({
@@ -61,6 +63,15 @@ const passwordFormSchema = z.object({
 const deleteFormSchema = z.object({
   currentPassword: z.string().min(1, "Please enter your password to confirm deletion."),
 });
+
+function SubmitButton({ isSubmitting, text, submittingText }: { isSubmitting: boolean; text: string; submittingText: string; }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" disabled={pending || isSubmitting}>
+      {pending || isSubmitting ? submittingText : text}
+    </Button>
+  );
+}
 
 export function AccountForm({ user, type }: AccountFormProps) {
   const router = useRouter();
@@ -80,8 +91,20 @@ export function AccountForm({ user, type }: AccountFormProps) {
     },
   });
 
-  const [isSubmitting, startTransition] = useTransition();
+  const { isSubmitting } = form.formState;
 
+  const [state, formAction] = useActionState(updateProfile, { message: null, status: null });
+  
+  useEffect(() => {
+    if (state.status) {
+      toast({
+        title: state.status === 'success' ? 'Success!' : 'Error',
+        description: state.message,
+        variant: state.status === 'error' ? 'destructive' : 'default',
+      });
+    }
+  }, [state, toast]);
+  
   useEffect(() => {
     if(type === 'profile'){
         form.reset({
@@ -91,229 +114,191 @@ export function AccountForm({ user, type }: AccountFormProps) {
     }
   }, [user, form, type]);
 
-  const handleProfileSubmit = (values: z.infer<typeof profileFormSchema>) => {
-    startTransition(async () => {
-        const formData = new FormData();
-        formData.append('firstName', values.firstName);
-        if (values.lastName) {
-            formData.append('lastName', values.lastName);
-        }
 
-        const result = await updateProfile({message: null, status: null}, formData);
-        
+  const handlePasswordSubmit = async (values: z.infer<typeof passwordFormSchema>) => {
+    try {
+        await reauthenticate(values.currentPassword);
+        await updateUserPassword(values.newPassword);
         toast({
-            title: result.status === 'success' ? 'Success!' : 'Error',
-            description: result.message,
-            variant: result.status === 'error' ? 'destructive' : 'default',
+            title: 'Success!',
+            description: "Your password has been changed.",
         });
-        
-        if (result.status === 'success') {
-            form.reset(values);
+        form.reset();
+    } catch (error) {
+        console.error(error);
+        let description = "Failed to change password. Please try again.";
+        if (error instanceof FirebaseError && (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential')) {
+            description = "The current password you entered is incorrect.";
         }
-    });
-  };
-
-  const handlePasswordSubmit = (values: z.infer<typeof passwordFormSchema>) => {
-    startTransition(async () => {
-      try {
-          await reauthenticate(values.currentPassword);
-          await updateUserPassword(values.newPassword);
-          toast({
-              title: 'Success!',
-              description: "Your password has been changed.",
-          });
-          form.reset();
-      } catch (error) {
-          console.error(error);
-          let description = "Failed to change password. Please try again.";
-          if (error instanceof FirebaseError && (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential')) {
-              description = "The current password you entered is incorrect.";
-          }
-          toast({
-              title: 'Error',
-              description,
-              variant: 'destructive',
-          });
-      }
-    });
+        toast({
+            title: 'Error',
+            description,
+            variant: 'destructive',
+        });
+    }
   };
   
-  const handleDeleteSubmit = (values: z.infer<typeof deleteFormSchema>) => {
-    startTransition(async () => {
-      try {
-          await reauthenticate(values.currentPassword);
-          await deleteUserAccount();
-          toast({
-              title: 'Account Deleted',
-              description: "Your account has been permanently deleted.",
-          });
-          await logout();
-          router.push('/');
-          router.refresh();
-      } catch (error) {
-          console.error(error);
-          let description = "An error occurred while deleting your account.";
-          if (error instanceof FirebaseError && (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential')) {
-              description = "The password you entered is incorrect.";
-          }
-          toast({
-              title: 'Error',
-              description,
-              variant: 'destructive',
-          });
-      }
-    });
+  const handleDeleteSubmit = async (values: z.infer<typeof deleteFormSchema>) => {
+    try {
+        await reauthenticate(values.currentPassword);
+        await deleteUserAccount();
+        toast({
+            title: 'Account Deleted',
+            description: "Your account has been permanently deleted.",
+        });
+        await logout();
+        router.push('/');
+        router.refresh();
+    } catch (error) {
+        console.error(error);
+        let description = "An error occurred while deleting your account.";
+        if (error instanceof FirebaseError && (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential')) {
+            description = "The password you entered is incorrect.";
+        }
+        toast({
+            title: 'Error',
+            description,
+            variant: 'destructive',
+        });
+    }
   };
 
   if (type === 'profile') {
     return (
-        <div>
-            <h3 className="text-lg font-semibold">Personal Information</h3>
-            <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleProfileSubmit)} className="space-y-6 max-w-lg mt-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                        control={form.control}
-                        name="firstName"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>First Name</FormLabel>
-                            <FormControl>
-                                <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <FormField
-                        control={form.control}
-                        name="lastName"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Last Name</FormLabel>
-                            <FormControl>
-                                <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                    </div>
-                    
-                    <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <Input value={user.email} readOnly disabled />
-                    </FormItem>
-                    
-                    <Button type="submit" disabled={isSubmitting}>
-                      {isSubmitting ? 'Saving...' : 'Save Changes'}
-                    </Button>
-                </form>
-            </Form>
-        </div>
+        <Form {...form}>
+            <form action={formAction} className="space-y-6 max-w-lg">
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>First Name</FormLabel>
+                        <FormControl>
+                            <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Last Name</FormLabel>
+                        <FormControl>
+                            <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                </div>
+                
+                <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <Input value={user.email} readOnly disabled />
+                </FormItem>
+                
+                <SubmitButton isSubmitting={isSubmitting} text="Save Changes" submittingText="Saving..." />
+            </form>
+        </Form>
     );
   }
 
   if (type === 'password') {
      return (
-        <div>
-            <h3 className="text-lg font-semibold">Change Password</h3>
-            <p className="text-sm text-muted-foreground">Update your password here. Please enter your current password first.</p>
-            <Form {...form}>
-                <form onSubmit={form.handleSubmit(handlePasswordSubmit)} className="space-y-4 max-w-md mt-4">
-                    <FormField
-                        control={form.control}
-                        name="currentPassword"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Current Password</FormLabel>
-                                <FormControl>
-                                    <Input type="password" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="newPassword"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>New Password</FormLabel>
-                                <FormControl>
-                                    <Input type="password" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="confirmPassword"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Confirm New Password</FormLabel>
-                                <FormControl>
-                                    <Input type="password" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <Button type="submit" disabled={isSubmitting}>
-                        {isSubmitting ? 'Changing...' : 'Change Password'}
-                    </Button>
-                </form>
-            </Form>
-        </div>
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(handlePasswordSubmit)} className="space-y-4 max-w-md">
+                <FormField
+                    control={form.control}
+                    name="currentPassword"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Current Password</FormLabel>
+                            <FormControl>
+                                <Input type="password" {...field} />
+                            </FormControl>
+                             <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="newPassword"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>New Password</FormLabel>
+                            <FormControl>
+                                <Input type="password" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Confirm New Password</FormLabel>
+                            <FormControl>
+                                <Input type="password" {...field} />
+                            </FormControl>
+                             <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? 'Changing...' : 'Change Password'}
+                </Button>
+            </form>
+        </Form>
      )
   }
 
  if (type === 'delete') {
     return (
-        <div>
-            <h3 className="text-lg font-semibold text-destructive">Delete Account</h3>
-             <p className="text-sm text-muted-foreground">Permanently delete your account and all associated data. This action cannot be undone.</p>
-            <AlertDialog>
-                <AlertDialogTrigger asChild>
-                    <Button variant="destructive" className="mt-4">Delete Account</Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <Form {...form}>
-                        <form onSubmit={form.handleSubmit(handleDeleteSubmit)}>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete your account. 
-                                    To confirm, please type your password below.
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <div className="py-4">
-                                <FormField
-                                    control={form.control}
-                                    name="currentPassword"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Current Password</FormLabel>
-                                            <FormControl>
-                                                <Input type="password" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
-                                <Button type="submit" variant="destructive" disabled={isSubmitting}>
-                                    {isSubmitting ? 'Deleting...' : 'Delete My Account'}
-                                </Button>
-                            </AlertDialogFooter>
-                        </form>
-                    </Form>
-                </AlertDialogContent>
-            </AlertDialog>
-        </div>
+        <AlertDialog>
+            <AlertDialogTrigger asChild>
+                <Button variant="destructive">Delete Account</Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(handleDeleteSubmit)}>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete your account. 
+                                To confirm, please type your password below.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <div className="py-4">
+                             <FormField
+                                control={form.control}
+                                name="currentPassword"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Current Password</FormLabel>
+                                        <FormControl>
+                                            <Input type="password" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+                            <Button type="submit" variant="destructive" disabled={isSubmitting}>
+                                {isSubmitting ? 'Deleting...' : 'Delete My Account'}
+                            </Button>
+                        </AlertDialogFooter>
+                    </form>
+                </Form>
+            </AlertDialogContent>
+        </AlertDialog>
     );
   }
 

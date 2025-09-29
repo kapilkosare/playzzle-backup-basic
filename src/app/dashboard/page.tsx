@@ -1,4 +1,3 @@
-
 // src/app/dashboard/page.tsx
 import { getAuthenticatedUser } from "@/lib/firebase/server-auth";
 import { redirect } from "next/navigation";
@@ -16,11 +15,6 @@ function formatTime(totalSeconds: number): string {
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
     return `${hours}h ${remainingMinutes}m`;
-}
-
-function formatCategoryName(name: string) {
-    if (name === 'N/A') return name;
-    return name.replace(/-/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
 }
 
 export default async function DashboardPage() {
@@ -71,7 +65,7 @@ export default async function DashboardPage() {
                         <Tag className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold capitalize">{formatCategoryName(stats.mostPlayedCategory)}</div>
+                        <div className="text-2xl font-bold capitalize">{stats.mostPlayedCategory}</div>
                     </CardContent>
                 </Card>
                  <Card>

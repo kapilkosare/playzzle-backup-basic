@@ -1,11 +1,12 @@
 
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { submitInterestForm } from './actions';
+import { submitInterestForm, type InterestFormState } from './actions';
 import { useToast } from '@/hooks/use-toast';
 
 import { Button } from '@/components/ui/button';
@@ -26,10 +27,18 @@ const formSchema = z.object({
   email: z.string().email('Invalid email address'),
 });
 
+function SubmitButton() {
+    const { pending } = useFormStatus();
+    return (
+        <Button type="submit" className="w-full" disabled={pending}>
+            {pending ? 'Submitting...' : 'Notify Me'}
+            <Send className="ml-2 h-4 w-4" />
+        </Button>
+    );
+}
 
 export function InterestForm() {
   const { toast } = useToast();
-  const [isSubmitting, startTransition] = useTransition();
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -38,26 +47,22 @@ export function InterestForm() {
       email: '',
     },
   });
-  
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    startTransition(async () => {
-        const formData = new FormData();
-        formData.append('name', values.name);
-        formData.append('email', values.email);
 
-        const result = await submitInterestForm({message: null, status: null}, formData);
-        
+  const initialState: InterestFormState = { message: null, status: null };
+  const [state, formAction] = useActionState(submitInterestForm, initialState);
+
+  useEffect(() => {
+    if (state.status) {
         toast({
-            title: result.status === 'success' ? 'Success!' : 'Error',
-            description: result.message,
-            variant: result.status === 'error' ? 'destructive' : 'default',
+            title: state.status === 'success' ? 'Success!' : 'Error',
+            description: state.message,
+            variant: state.status === 'error' ? 'destructive' : 'default',
         });
-        
-        if (result.status === 'success') {
+        if (state.status === 'success') {
             form.reset();
         }
-    });
-  }
+    }
+  }, [state, toast, form]);
 
   return (
     <Card className="max-w-md mx-auto mt-12 border-primary border-2 shadow-lg">
@@ -70,7 +75,7 @@ export function InterestForm() {
         <CardContent>
              <Form {...form}>
                 <form
-                    onSubmit={form.handleSubmit(onSubmit)}
+                    action={formAction}
                     className="grid gap-4"
                 >
                     <FormField
@@ -100,10 +105,7 @@ export function InterestForm() {
                         </FormItem>
                         )}
                     />
-                    <Button type="submit" className="w-full" disabled={isSubmitting}>
-                        {isSubmitting ? 'Submitting...' : 'Notify Me'}
-                        <Send className="ml-2 h-4 w-4" />
-                    </Button>
+                    <SubmitButton />
                 </form>
             </Form>
         </CardContent>

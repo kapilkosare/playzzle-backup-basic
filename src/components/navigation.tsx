@@ -4,7 +4,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogIn, UserPlus, User, LogOut, Crown, Star, LayoutDashboard, Menu } from 'lucide-react';
+import { LogIn, UserPlus, User, LogOut, ShieldCheck, Star, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './theme-toggle';
 import type { AuthenticatedUser } from '@/lib/firebase/server-auth';
@@ -16,15 +16,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetTrigger,
-  SheetClose
-} from "@/components/ui/sheet";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Button, buttonVariants } from './ui/button';
 import { logout } from '@/lib/firebase/auth';
@@ -33,19 +24,17 @@ import { LogoIcon } from './icons/logo';
 
 const navLinks = [
   { href: '/', label: 'Home' },
-  { href: '/puzzles', label: 'Puzzles' },
+  { href: '/puzzles', label: 'Multi Puzzles' },
   { href: '/slide-puzzle', label: 'Slide Puzzle' },
-  { href: '/move-puzzle', label: 'Jigsaw Puzzle' },
+  { href: '/move-puzzle', label: 'Move Puzzle' },
   { href: '/contact', label: 'Contact' },
 ];
 
 type NavigationProps = {
     user: AuthenticatedUser | null;
-    isPro: boolean;
-    isSuperAdmin: boolean;
 }
 
-export default function Navigation({ user, isPro, isSuperAdmin }: NavigationProps) {
+export default function Navigation({ user }: { user: AuthenticatedUser | null }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -57,8 +46,7 @@ export default function Navigation({ user, isPro, isSuperAdmin }: NavigationProp
 
   const getInitials = (name?: string | null, email?: string | null): string => {
     if (name) {
-        const names = name.trim().split(' ').filter(Boolean);
-        if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
+        const names = name.trim().split(' ');
         const firstName = names[0] ?? '';
         const lastName = names.length > 1 ? names[names.length - 1] : '';
         return `${firstName[0] || ''}${lastName[0] || ''}`.toUpperCase();
@@ -73,55 +61,10 @@ export default function Navigation({ user, isPro, isSuperAdmin }: NavigationProp
     <header className="bg-card border-b sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-           <div className="flex items-center gap-4">
-             <Sheet>
-                <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" className="md:hidden">
-                        <Menu />
-                        <span className="sr-only">Toggle Menu</span>
-                    </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-64">
-                    <SheetHeader className="sr-only">
-                      <SheetTitle>Mobile Menu</SheetTitle>
-                      <SheetDescription>
-                        A list of navigation links for the Playzzle application.
-                      </SheetDescription>
-                    </SheetHeader>
-                    <nav className="flex flex-col gap-4 mt-8">
-                        {navLinks.map((link) => (
-                           <SheetClose asChild key={link.href}>
-                             <Link
-                                href={link.href}
-                                className={cn(
-                                    'text-lg font-medium transition-colors hover:text-primary',
-                                    pathname === link.href ? 'text-primary' : 'text-muted-foreground'
-                                )}
-                                >
-                                {link.label}
-                             </Link>
-                           </SheetClose>
-                        ))}
-                         <SheetClose asChild>
-                           <Link
-                                href="/membership"
-                                className={cn(
-                                    'flex items-center gap-2 text-lg font-medium transition-colors hover:text-amber-400',
-                                    pathname === '/membership' ? 'text-amber-400' : 'text-muted-foreground'
-                                )}
-                                >
-                                <Star className="w-5 h-5 text-amber-500" />
-                                Go Pro
-                           </Link>
-                         </SheetClose>
-                    </nav>
-                </SheetContent>
-            </Sheet>
-            <Link href="/" className="flex items-center gap-2 font-bold text-lg text-primary">
-                <LogoIcon className="w-8 h-8" />
-                <span className="text-foreground">Playzzle</span>
-            </Link>
-          </div>
+          <Link href="/" className="flex items-center gap-2 font-bold text-lg text-primary">
+            <LogoIcon className="w-8 h-8" />
+            <span className="text-foreground">Playzzle</span>
+          </Link>
           <div className="flex items-center gap-4">
             <nav className="hidden md:flex items-center space-x-6">
               {navLinks.map((link) => (
@@ -156,11 +99,6 @@ export default function Navigation({ user, isPro, isSuperAdmin }: NavigationProp
                                 <AvatarImage src={user.picture ?? undefined} alt={user.name ?? ''} />
                                 <AvatarFallback>{getInitials(user.name, user.email)}</AvatarFallback>
                             </Avatar>
-                            {isSuperAdmin ? (
-                                <Crown className="absolute bottom-0 right-0 w-4 h-4 fill-destructive text-destructive-foreground rounded-full bg-card p-0.5" />
-                            ) : isPro && (
-                                <Star className="absolute bottom-0 right-0 w-4 h-4 fill-amber-400 text-amber-500 rounded-full bg-card p-0.5" />
-                            )}
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-56" align="end" forceMount>
@@ -178,7 +116,7 @@ export default function Navigation({ user, isPro, isSuperAdmin }: NavigationProp
                             <>
                                 <DropdownMenuItem asChild>
                                     <Link href="/super-admin">
-                                        <Crown className="mr-2 h-4 w-4" />
+                                        <ShieldCheck className="mr-2 h-4 w-4" />
                                         <span>Super Admin</span>
                                     </Link>
                                 </DropdownMenuItem>
@@ -206,11 +144,11 @@ export default function Navigation({ user, isPro, isSuperAdmin }: NavigationProp
             ) : (
                 <div className="flex items-center gap-2">
                      <Link href="/login" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "flex items-center gap-2")}>
-                        <LogIn className="h-4 w-4"/>
+                        <LogIn />
                         Login
                     </Link>
                      <Link href="/signup" className={cn(buttonVariants({ variant: "default", size: "sm" }), "hidden sm:flex items-center gap-2")}>
-                        <UserPlus className="h-4 w-4"/>
+                        <UserPlus />
                         Sign Up
                     </Link>
                 </div>

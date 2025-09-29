@@ -1,16 +1,13 @@
 
 import { Button } from '@/components/ui/button';
 import { getAuthenticatedUser } from '@/lib/firebase/server-auth';
-import { ArrowRight, Gift } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { LogoIcon } from '@/components/icons/logo';
-import fs from 'fs/promises';
+import fs from 'fs';
 import path from 'path';
 import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
-import { getSiteSettings } from './super-admin/settings/actions';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 
 type PuzzleImage = {
   src: string;
@@ -19,19 +16,18 @@ type PuzzleImage = {
 };
 
 // Function to get a few random puzzles to display on the home page
-const getRandomPuzzles = async (count: number): Promise<PuzzleImage[]> => {
+const getRandomPuzzles = (count: number): PuzzleImage[] => {
     const puzzlesDir = path.join(process.cwd(), 'public', 'puzzles');
     const allPuzzles: PuzzleImage[] = [];
 
     try {
-        const dirents = await fs.readdir(puzzlesDir, { withFileTypes: true });
-        const categories = dirents
-            .filter((dirent) => dirent.isDirectory())
-            .map((dirent) => dirent.name);
+        const categories = fs.readdirSync(puzzlesDir).filter((file) =>
+            fs.statSync(path.join(puzzlesDir, file)).isDirectory()
+        );
 
-        for (const category of categories) {
+        categories.forEach((category) => {
             const categoryDir = path.join(puzzlesDir, category);
-            const imageFiles = (await fs.readdir(categoryDir)).filter(file =>
+            const imageFiles = fs.readdirSync(categoryDir).filter(file =>
                 /\.(jpg|jpeg|png|webp)$/i.test(file) && !file.toLowerCase().includes('_pro')
             );
             imageFiles.forEach((file) => {
@@ -41,7 +37,7 @@ const getRandomPuzzles = async (count: number): Promise<PuzzleImage[]> => {
                     filename: file,
                 });
             });
-        }
+        });
 
         // Shuffle the array and pick the first 'count' items
         const shuffled = allPuzzles.sort(() => 0.5 - Math.random());
@@ -56,8 +52,7 @@ const getRandomPuzzles = async (count: number): Promise<PuzzleImage[]> => {
 
 export default async function WelcomePage() {
     const user = await getAuthenticatedUser();
-    const randomPuzzles = await getRandomPuzzles(6);
-    const { offerEnabled, offerTitle, offerDescription, offerShopNowText } = await getSiteSettings();
+    const randomPuzzles = getRandomPuzzles(6);
 
     // Define positions for the cards
     const cardPositions = [
@@ -70,6 +65,7 @@ export default async function WelcomePage() {
         { bottom: '10%', right: '20%', rotation: '-3deg', duration: '18s', delay: '3s' },
         { top: '55%', right: '5%', rotation: '8deg', duration: '16s', delay: '5s' },
     ];
+
 
     return (
         <div className="dotted-background relative flex flex-col items-center justify-center text-center py-24 px-4 h-full overflow-hidden">
@@ -125,7 +121,6 @@ export default async function WelcomePage() {
                     The ultimate destination to create and solve beautiful jigsaw puzzles from any image.
                     Challenge your mind, relax, and have fun.
                 </p>
-
                 <div>
                     {user ? (
                         <Button asChild size="lg">
@@ -137,10 +132,10 @@ export default async function WelcomePage() {
                         <div className="flex flex-col sm:flex-row gap-4 justify-center">
                             <Button asChild size="lg">
                                 <Link href="/login">
-                                    Log In
+                                    Get Started <ArrowRight className="ml-2" />
                                 </Link>
                             </Button>
-                             <Button asChild size="lg" variant="outline">
+                            <Button asChild size="lg" variant="outline">
                                 <Link href="/signup">
                                     Sign Up
                                 </Link>
@@ -149,25 +144,6 @@ export default async function WelcomePage() {
                     )}
                 </div>
             </div>
-            
-            {offerEnabled && !user && (
-                 <Link href="/signup" className="fixed bottom-8 right-8 z-50 group">
-                    <div
-                        className="relative w-52 h-52 rounded-full flex flex-col items-center justify-center text-center p-4 shadow-2xl transition-transform group-hover:scale-110 bg-white border-8 border-offer-yellow"
-                    >
-                        <div className="absolute inset-0 rounded-full border-4 border-dashed border-primary"></div>
-                        
-                        <div className="absolute -top-4 bg-offer-yellow px-3 py-1 rounded-md">
-                            <span className="text-sm font-bold text-black tracking-wider">{offerShopNowText}</span>
-                        </div>
-                        
-                        <div className="relative text-black">
-                             <p className="text-2xl font-extrabold text-offer-red uppercase" style={{ WebkitTextStroke: '1px black' }}>{offerTitle}</p>
-                            <p className="text-xs font-semibold italic">{offerDescription}</p>
-                        </div>
-                    </div>
-                </Link>
-            )}
         </div>
     );
 }

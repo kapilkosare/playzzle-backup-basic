@@ -7,7 +7,6 @@ import { ThemeProvider } from '@/components/theme-provider';
 import Footer from '@/components/footer';
 import { Inter } from 'next/font/google';
 import { getAuthenticatedUser } from '@/lib/firebase/server-auth';
-import { getUserProStatus } from '@/app/account/actions';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -25,12 +24,6 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const user = await getAuthenticatedUser();
-  let isPro = false;
-  const isSuperAdmin = !!user?.customClaims?.superadmin;
-
-  if (user) {
-    isPro = (await getUserProStatus(user.uid)).isPro;
-  }
 
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
@@ -47,7 +40,7 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <div className="flex flex-col h-full">
-            <Navigation user={user} isPro={isPro} isSuperAdmin={isSuperAdmin} />
+            <Navigation user={user} />
             <main className="flex-grow bg-background">
               {children}
             </main>

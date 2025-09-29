@@ -1,10 +1,5 @@
-
 import DynamicPuzzleGame from '@/components/dynamic-puzzle-game';
-import { getUnlockedPuzzles, getUserProStatus } from '@/app/account/actions';
-import { getAuthenticatedUser } from '@/lib/firebase/server-auth';
 import { Metadata } from 'next';
-import { redirect } from 'next/navigation';
-import { getSiteSettings } from '@/app/super-admin/settings/actions'; // Import the new function
 
 type PlayPageProps = {
   params: {
@@ -23,6 +18,8 @@ export async function generateMetadata({ params }: PlayPageProps): Promise<Metad
   const imageFilename = decodeURIComponent(params.slug[1]);
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+
+  // ✅ absolute URL for social previews
   const imageUrl = `${siteUrl}/puzzles/${category}/${imageFilename}`;
 
   const title = "I'm playing Playzzle!";
@@ -49,12 +46,12 @@ export async function generateMetadata({ params }: PlayPageProps): Promise<Metad
       card: 'summary_large_image',
       title,
       description,
-      images: [imageUrl],
+      images: [imageUrl], // ✅ must be absolute
     },
   };
 }
 
-export default async function PlayPage({ params }: PlayPageProps) {
+export default function PlayPage({ params }: PlayPageProps) {
   if (!params.slug || params.slug.length < 2) {
     return <div>Invalid image path.</div>;
   }
@@ -63,30 +60,6 @@ export default async function PlayPage({ params }: PlayPageProps) {
   const imageFilename = decodeURIComponent(params.slug[1]);
   const imagePath = `/puzzles/${category}/${imageFilename}`;
   const slug = `${category}/${imageFilename}`;
-  
-  // Fetch site settings
-  const { mobilePlayEnabled } = await getSiteSettings();
-
-  // Pro puzzle check
-  const isProPuzzle = imageFilename.toLowerCase().includes('_pro');
-  if (isProPuzzle) {
-      const user = await getAuthenticatedUser();
-      
-      if (!user) {
-          redirect('/membership');
-      }
-
-      const isSuperAdmin = !!user?.customClaims?.superadmin;
-      const { isPro } = await getUserProStatus(user.uid);
-      const unlockedPuzzles = await getUnlockedPuzzles(user.uid);
-      
-      const isUnlocked = isSuperAdmin || isPro || unlockedPuzzles.includes(imageFilename);
-
-      if (!isUnlocked) {
-          redirect('/membership');
-      }
-  }
-
 
   return (
     <div className="w-full h-full">
@@ -94,7 +67,6 @@ export default async function PlayPage({ params }: PlayPageProps) {
         imageSrc={imagePath}
         slug={slug}
         imageFilename={imageFilename}
-        mobilePlayEnabled={mobilePlayEnabled}
       />
     </div>
   );

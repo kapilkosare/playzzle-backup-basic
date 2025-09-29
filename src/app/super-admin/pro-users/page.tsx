@@ -14,9 +14,6 @@ import {
 import { format } from 'date-fns';
 import { PaginationControls } from "@/components/pagination-controls";
 import { Search } from "@/components/search";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 
 type ProUsersPageProps = {
     searchParams?: {
@@ -39,12 +36,6 @@ export default async function ProUsersPage({ searchParams }: ProUsersPageProps) 
 
     return (
         <div className="container mx-auto py-8 px-4">
-            <Button asChild variant="outline" className="mb-4">
-                <Link href="/super-admin">
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to Dashboard
-                </Link>
-            </Button>
             <h1 className="text-3xl font-bold mb-8">Pro Membership Interest List</h1>
              <Card>
                 <CardHeader>

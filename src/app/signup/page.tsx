@@ -1,8 +1,7 @@
-
 // src/app/signup/page.tsx
 'use client';
 
-import { useState, useEffect, useTransition } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -72,11 +71,8 @@ export default function SignupPage() {
   
   const [num1, setNum1] = useState(0);
   const [num2, setNum2] = useState(0);
-  const [isClient, setIsClient] = useState(false);
-  const [isSubmitting, startTransition] = useTransition();
 
   useEffect(() => {
-    setIsClient(true);
     generateCaptcha();
   }, []);
 
@@ -103,42 +99,43 @@ export default function SignupPage() {
     },
   })
 
+  const { isSubmitting } = form.formState;
+
   const handleSignup = async (values: z.infer<typeof signupFormSchema>) => {
     const { email, password, firstName, lastName } = values;
-    startTransition(async () => {
-        try {
-        await signup(email, password, { firstName, lastName });
-        toast({
-            title: 'Success!',
-            description: "Your account has been created. Please check your email to verify your account before logging in.",
-        });
-        router.push('/login');
-        } catch (error) {
-        console.error(error);
-        let errorMessage = 'An unexpected error occurred.';
-        if (error instanceof FirebaseError) {
-            switch (error.code) {
-            case 'auth/email-already-in-use':
-                errorMessage = 'This email is already in use.';
-                break;
-            case 'auth/weak-password':
-                errorMessage = 'The password is too weak. It must be at least 6 characters long.';
-                break;
-            default:
-                errorMessage = error.message;
-                break;
-            }
+
+    try {
+      await signup(email, password, { firstName, lastName });
+      toast({
+        title: 'Success!',
+        description: "Your account has been created. Please check your email to verify your account before logging in.",
+      });
+      router.push('/login');
+    } catch (error) {
+      console.error(error);
+       let errorMessage = 'An unexpected error occurred.';
+      if (error instanceof FirebaseError) {
+        switch (error.code) {
+          case 'auth/email-already-in-use':
+            errorMessage = 'This email is already in use.';
+            break;
+          case 'auth/weak-password':
+            errorMessage = 'The password is too weak. It must be at least 6 characters long.';
+            break;
+          default:
+            errorMessage = error.message;
+            break;
         }
-        toast({
-            title: 'Signup Failed',
-            description: errorMessage,
-            variant: 'destructive',
-        });
-        } finally {
-            generateCaptcha();
-            form.resetField("captcha");
-        }
-    });
+      }
+      toast({
+        title: 'Signup Failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+        generateCaptcha();
+        form.resetField("captcha");
+    }
   };
   
   const months = [
@@ -278,21 +275,19 @@ export default function SignupPage() {
                   </FormItem>
                 )}
               />
-              {isClient && (
-                <FormField
-                  control={form.control}
-                  name="captcha"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>What is {num1} + {num2}?</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="Your answer" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
+               <FormField
+                control={form.control}
+                name="captcha"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>What is {num1} + {num2}?</FormLabel>
+                    <FormControl>
+                       <Input type="number" placeholder="Your answer" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <Button type="submit" className="w-full" disabled={isSubmitting}>
                 {isSubmitting ? 'Creating Account...' : 'Create an account'}

@@ -3,6 +3,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Carousel,
   CarouselContent,
@@ -11,232 +13,29 @@ import {
   CarouselPrevious,
 } from '@/components/ui/carousel';
 import { Button } from './ui/button';
-import { ArrowRight, Loader2, Pencil, Trash2 } from 'lucide-react';
-import type { AuthenticatedUser } from '@/lib/firebase/server-auth';
-import PuzzleCard, { type PuzzleImage } from './puzzle-card';
-import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
-import { AdminControls } from './admin-controls';
-import { renameCategory, deleteCategory, checkAndReleaseDailyPuzzle, type Category } from '@/app/puzzles/actions';
-import { useToast } from '@/hooks/use-toast';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { useRouter } from 'next/navigation';
+import { ArrowRight, Star } from 'lucide-react';
+import ProPuzzleLink from './pro-puzzle-link';
+
+type PuzzleImage = {
+  src: string;
+  category: string;
+  filename: string;
+  isPro: boolean;
+};
 
 type HomePageProps = {
-  categories: Category[];
+  imagesByCategory: Record<string, PuzzleImage[]>;
   isSuperAdmin: boolean;
-  isProUser: boolean;
-  unlockedPuzzleIds: string[];
-  user: AuthenticatedUser | null;
-  hasSinglePurchaseCredit: boolean;
-  creditTransactionId: string | null;
-  wishlist: string[];
 };
 
 const INITIAL_CATEGORIES = 5;
 const LOAD_MORE_COUNT = 2;
 
-function formatCategoryName(name: string) {
-    return name.replace(/-/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
-}
-
-function CategoryCarousel({ category, ...rest }: any) {
-    const [puzzles, setPuzzles] = useState<PuzzleImage[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchPuzzles = async () => {
-            try {
-                const response = await fetch(`/api/puzzles?category=${encodeURIComponent(category)}`);
-                const data = await response.json();
-                setPuzzles(data.slice(0, 7)); // Only show up to 7 in the carousel
-            } catch (error) {
-                console.error("Failed to fetch puzzles for category:", category, error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchPuzzles();
-    }, [category]);
-    
-    if (isLoading) {
-        return (
-            <div className="flex items-center justify-center h-48">
-                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-            </div>
-        );
-    }
-
-    if (puzzles.length === 0 && !rest.isSuperAdmin) {
-        return null; // Don't render the carousel if there are no puzzles for non-admins
-    }
-
-    return (
-        <Carousel
-            opts={{
-                align: 'start',
-                loop: puzzles.length > 5,
-            }}
-            className="w-full"
-        >
-            <CarouselContent>
-                {puzzles.length > 0 ? puzzles.map((image) => (
-                    <CarouselItem key={image.filename} className="md:basis-1/3 lg:basis-1/5">
-                        <div className="p-1">
-                            <PuzzleCard image={image} {...rest} />
-                        </div>
-                    </CarouselItem>
-                )) : (
-                     <CarouselItem>
-                        <div className="p-1 text-center text-muted-foreground">
-                            This category is empty. Upload a puzzle!
-                        </div>
-                    </CarouselItem>
-                )}
-            </CarouselContent>
-            <CarouselPrevious className="absolute top-1/2 -left-4 -translate-y-1/2" />
-            <CarouselNext className="absolute top-1/2 -right-4 -translate-y-1/2" />
-        </Carousel>
-    );
-}
-
-function CategoryAdminActions({ category, onRename, onDelete }: { category: string, onRename: (oldName: string, newName: string) => void, onDelete: (name: string) => void }) {
-    const { toast } = useToast();
-    const [isRenameOpen, setIsRenameOpen] = useState(false);
-    const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-    const [newCategoryName, setNewCategoryName] = useState(category);
-    const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
-
-    const handleRename = async () => {
-        const result = await renameCategory(category, newCategoryName);
-        if (result.success) {
-            toast({ title: 'Success', description: result.message });
-            onRename(category, newCategoryName);
-            setIsRenameOpen(false);
-        } else {
-            toast({ variant: 'destructive', title: 'Error', description: result.message });
-        }
-    }
-
-    const handleDelete = async () => {
-        const result = await deleteCategory(category);
-         if (result.success) {
-            toast({ title: 'Success', description: result.message });
-            onDelete(category);
-            setIsDeleteOpen(false);
-        } else {
-            toast({ variant: 'destructive', title: 'Error', description: result.message });
-        }
-    }
-
-    const handleOpenDeleteDialog = (open: boolean) => {
-        if (!open) {
-            setDeleteConfirmationInput('');
-        }
-        setIsDeleteOpen(open);
-    }
-
-    return (
-        <>
-             <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsRenameOpen(true)}>
-                    <Pencil className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setIsDeleteOpen(true)}>
-                    <Trash2 className="h-4 w-4" />
-                </Button>
-            </div>
-            
-             {/* Rename Dialog */}
-            <AlertDialog open={isRenameOpen} onOpenChange={setIsRenameOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Rename Category</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Enter a new name for the category '{formatCategoryName(category)}'. Use lowercase letters, numbers, and hyphens only.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <Input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} />
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleRename}>Rename</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-             {/* Delete Dialog */}
-            <AlertDialog open={isDeleteOpen} onOpenChange={handleOpenDeleteDialog}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                           This will permanently delete the category '{formatCategoryName(category)}' and all puzzles inside it. This action cannot be undone.
-                           <br/><br/>
-                           To confirm, please type <strong>delete</strong> in the box below.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <div className="py-2">
-                        <Label htmlFor="delete-confirm-input" className="sr-only">Confirm Deletion</Label>
-                        <Input 
-                            id="delete-confirm-input"
-                            value={deleteConfirmationInput}
-                            onChange={(e) => setDeleteConfirmationInput(e.target.value)}
-                            placeholder='Type "delete" to confirm'
-                        />
-                    </div>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction 
-                            onClick={handleDelete} 
-                            className="bg-destructive hover:bg-destructive/90"
-                            disabled={deleteConfirmationInput !== 'delete'}
-                        >
-                            Delete
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-        </>
-    )
-}
-
-export default function HomePage({ categories: initialCategories, ...userProps }: HomePageProps) {
-  const [allCategories, setAllCategories] = useState(initialCategories);
+export default function HomePage({ imagesByCategory, isSuperAdmin }: HomePageProps) {
+  const allCategories = Object.keys(imagesByCategory);
   const [visibleCategories, setVisibleCategories] = useState(
-    initialCategories.slice(0, INITIAL_CATEGORIES)
+    allCategories.slice(0, INITIAL_CATEGORIES)
   );
-  const router = useRouter();
-
-  // Trigger the daily puzzle check on the client side.
-  useEffect(() => {
-    // We only want to run this once on mount
-    let isMounted = true;
-
-    async function dailyCheck() {
-        const { released } = await checkAndReleaseDailyPuzzle();
-        if (isMounted && released) {
-            // A new puzzle was released, so we refresh the page to get the latest data
-            router.refresh();
-        }
-    }
-    dailyCheck();
-    
-    return () => {
-        isMounted = false;
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array ensures this runs only once on mount.
-
 
   const handleScroll = useCallback(() => {
     if (window.innerHeight + document.documentElement.scrollTop < document.documentElement.offsetHeight - 500) {
@@ -246,7 +45,7 @@ export default function HomePage({ categories: initialCategories, ...userProps }
     if (visibleCategories.length < allCategories.length) {
       const nextIndex = visibleCategories.length;
       const newCategories = allCategories.slice(nextIndex, nextIndex + LOAD_MORE_COUNT);
-      setVisibleCategories(prev => [...new Set([...prev, ...newCategories])]);
+      setVisibleCategories(prev => [...prev, ...newCategories]);
     }
   }, [visibleCategories.length, allCategories]);
 
@@ -254,36 +53,18 @@ export default function HomePage({ categories: initialCategories, ...userProps }
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
-  
-  useEffect(() => {
-    setAllCategories(initialCategories);
-    setVisibleCategories(initialCategories.slice(0, INITIAL_CATEGORIES));
-  }, [initialCategories]);
 
-  const handleRenameCategory = (oldName: string, newName: string) => {
-    const update = (list: Category[]) => list.map(c => c.name === oldName ? {...c, name: newName} : c).sort((a,b) => a.displayOrder - b.displayOrder);
-    setAllCategories(update);
-    setVisibleCategories(update);
-  }
-  
-  const handleDeleteCategory = (name: string) => {
-    const update = (list: Category[]) => list.filter(c => c.name !== name);
-    setAllCategories(update);
-    setVisibleCategories(update);
-  }
-
-  if (allCategories.length === 0 && !userProps.isSuperAdmin) {
+  if (allCategories.length === 0) {
     return (
         <div className="container mx-auto py-8 px-4 text-center">
             <h1 className="text-3xl font-bold mb-4">Welcome to Playzzle!</h1>
-            <p className="text-muted-foreground">No puzzles found. The administrator needs to add some puzzles to get started.</p>
+            <p className="text-muted-foreground">No puzzles found. Create a `public/puzzles` directory, add category folders, and place your images inside to get started.</p>
         </div>
     )
   }
 
   return (
     <div className="container mx-auto py-8 px-4">
-      {userProps.isSuperAdmin && <AdminControls categories={allCategories.map(c => c.name)} />}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         <div className="lg:col-span-1">
           <Card>
@@ -293,9 +74,9 @@ export default function HomePage({ categories: initialCategories, ...userProps }
             <CardContent>
               <ul className="space-y-2">
                 {allCategories.map((category) => (
-                  <li key={category.name}>
+                  <li key={category}>
                     <Button variant="ghost" className="w-full justify-start capitalize" asChild>
-                      <Link href={`#${category.name}`}>{formatCategoryName(category.name)}</Link>
+                      <Link href={`/category/${category}`}>{category}</Link>
                     </Button>
                   </li>
                 ))}
@@ -305,27 +86,85 @@ export default function HomePage({ categories: initialCategories, ...userProps }
         </div>
         <div className="lg:col-span-3 space-y-8">
           {visibleCategories.map((category) => (
-            <div key={category.name} id={category.name} className="scroll-mt-20 relative">
+            <div key={category} id={category} className="scroll-mt-20 relative">
               <div className="flex justify-between items-center mb-4">
-                 <h2 className="text-2xl font-bold capitalize">{formatCategoryName(category.name)}</h2>
+                <h2 className="text-2xl font-bold capitalize">{category}</h2>
                 <div className="flex items-center gap-2">
-                    {userProps.isSuperAdmin && <CategoryAdminActions category={category.name} onRename={handleRenameCategory} onDelete={handleDeleteCategory} />}
                     <Button variant="outline" size="sm" asChild>
-                      <Link href={`/category/${category.name}`}>
+                      <Link href={`/category/${category}`}>
                         View More <ArrowRight className="ml-2 h-4 w-4" />
                       </Link>
                     </Button>
                 </div>
               </div>
-              <CategoryCarousel category={category.name} {...userProps} />
+              <Carousel
+                opts={{
+                  align: 'start',
+                  loop: imagesByCategory[category].length > 5,
+                }}
+                className="w-full"
+              >
+                
+                <CarouselContent>
+                  {imagesByCategory[category].slice(0, 7).map((image, index) => (
+                    <CarouselItem key={index} className="md:basis-1/3 lg:basis-1/5">
+                      <div className="p-1">
+                        <div className="group relative">
+                           <Card className="overflow-hidden">
+                            {image.isPro && (
+                                <div className="absolute top-2 right-2 z-10 bg-destructive text-destructive-foreground text-xs font-bold px-2 py-1 rounded-full shadow-lg">
+                                    PRO
+                                </div>
+                            )}
+                            <CardContent className="p-0">
+                                <ProPuzzleLink image={image} isSuperAdmin={isSuperAdmin}>
+                                  <div className="aspect-[3/4] relative">
+                                      <Image
+                                      src={image.src}
+                                      alt={`Puzzle ${index + 1}`}
+                                      fill
+                                      className="object-cover transition-all"
+                                      sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw"
+                                      data-ai-hint="puzzle landscape"
+                                      />
+                                      <div className="absolute inset-0 bg-black/20 pointer-events-none">
+                                          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                                              <defs>
+                                                  <pattern id="puzzle-pattern-home" patternUnits="userSpaceOnUse" width="100" height="100">
+                                                      <path d="M50 0 v20 a15 15 0 0 0 0 30 v20 a15 15 0 0 1 0 30 v20 M0 50 h20 a15 15 0 0 1 30 0 h20 a15 15 0 0 0 30 0 h20"
+                                                          fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" />
+                                                  </pattern>
+                                              </defs>
+                                              <rect width="100%" height="100%" fill="url(#puzzle-pattern-home)" />
+                                          </svg>
+                                      </div>
+                                  </div>
+                                </ProPuzzleLink>
+                            </CardContent>
+                            </Card>
+                             <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-auto max-h-[400px] z-20 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition-all duration-300">
+                                <div className="bg-white p-2 rounded-md shadow-lg border">
+                                    <div className="relative aspect-auto w-full h-full">
+                                    <Image
+                                        src={image.src}
+                                        alt={`Puzzle Preview ${index + 1}`}
+                                        fill
+                                        className="object-contain"
+                                        sizes="30vw"
+                                    />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                      </div>
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+                <CarouselPrevious className="absolute top-1/2 -left-4 -translate-y-1/2" />
+                <CarouselNext className="absolute top-1/2 -right-4 -translate-y-1/2" />
+              </Carousel>
             </div>
           ))}
-           {allCategories.length === 0 && userProps.isSuperAdmin && (
-             <div className="text-center py-16 border-2 border-dashed rounded-lg">
-                <h2 className="text-xl font-semibold">No Categories Found</h2>
-                <p className="text-muted-foreground mt-2">Use the controls to create your first puzzle category.</p>
-            </div>
-          )}
         </div>
       </div>
     </div>

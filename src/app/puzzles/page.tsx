@@ -1,37 +1,48 @@
 
 import HomePage from '@/components/home-page';
 import { getAuthenticatedUser } from '@/lib/firebase/server-auth';
-import { getUnlockedPuzzles, getUserProStatus, getSinglePuzzleCredit, getWishlist } from '../account/actions';
-import { getCategories } from './actions';
+import fs from 'fs';
+import path from 'path';
+
+type PuzzleImage = {
+  src: string;
+  category: string;
+  filename: string;
+  isPro: boolean;
+};
+
+const getPuzzles = (): Record<string, PuzzleImage[]> => {
+  const puzzlesDir = path.join(process.cwd(), 'public', 'puzzles');
+  try {
+    const categories = fs.readdirSync(puzzlesDir).filter((file) => 
+      fs.statSync(path.join(puzzlesDir, file)).isDirectory()
+    );
+
+    const imagesByCategory: Record<string, PuzzleImage[]> = {};
+    categories.forEach((category) => {
+      const categoryDir = path.join(puzzlesDir, category);
+      const imageFiles = fs.readdirSync(categoryDir).filter(file => 
+        /\.(jpg|jpeg|png|webp)$/i.test(file)
+      );
+      imagesByCategory[category] = imageFiles.map((file) => ({
+        src: `/puzzles/${category}/${file}`,
+        category,
+        filename: file,
+        isPro: file.toLowerCase().includes('_pro'),
+      }));
+    });
+
+    return imagesByCategory;
+  } catch (error) {
+    // If the directory doesn't exist, return empty
+    return {};
+  }
+};
 
 
 export default async function PuzzlesPage() {
-  const categories = await getCategories();
+  const imagesByCategory = getPuzzles();
   const user = await getAuthenticatedUser();
   const isSuperAdmin = !!user?.customClaims?.superadmin;
-
-  let isPro = false;
-  let unlockedPuzzleIds: string[] = [];
-  let singlePuzzleCredit: { hasCredit: boolean; transactionId: string | null } = { hasCredit: false, transactionId: null };
-  let wishlist: string[] = [];
-
-  if (user) {
-    isPro = (await getUserProStatus(user.uid)).isPro;
-    unlockedPuzzleIds = await getUnlockedPuzzles(user.uid);
-    singlePuzzleCredit = await getSinglePuzzleCredit(user.uid);
-    wishlist = await getWishlist(user.uid);
-  }
-
-  return (
-    <HomePage 
-        categories={categories} 
-        isSuperAdmin={isSuperAdmin} 
-        isProUser={isPro} 
-        user={user} 
-        unlockedPuzzleIds={unlockedPuzzleIds || []}
-        hasSinglePurchaseCredit={singlePuzzleCredit.hasCredit}
-        creditTransactionId={singlePuzzleCredit.transactionId}
-        wishlist={wishlist}
-    />
-  );
+  return <HomePage imagesByCategory={imagesByCategory} isSuperAdmin={isSuperAdmin} />;
 }

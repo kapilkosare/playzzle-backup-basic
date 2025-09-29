@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useRef, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,12 +25,11 @@ import {
     DialogFooter,
     DialogClose,
   } from "@/components/ui/dialog"
-import { Upload, Puzzle, ImageIcon, TimerIcon, Sparkles, Play, Pause, XCircle, Star, Eye, EyeOff, Move, CornerDownRight } from 'lucide-react';
+import { Upload, Puzzle, ImageIcon, TimerIcon, Sparkles, Play, RotateCcw, Pause, Star, XCircle, Eye, EyeOff, Move, CornerDownRight } from 'lucide-react';
 import { useTimer } from '@/hooks/use-timer';
 import { useBestTime } from '@/hooks/use-best-time';
 import ShareButton from './share-button';
 import { recordGameCompletion } from '@/app/dashboard/actions';
-import type { GameActionsHandle } from './dynamic-puzzle-game';
 
 
 const GRID_SIZES = [3, 4, 5, 6, 7, 8, 9, 10];
@@ -51,20 +50,10 @@ type PiczzleGameProps = {
     onStatsChange?: (stats: { moves: number; time: string }) => void;
     slug?: string;
     imageFilename?: string;
-    gridSizeFromHome?: number;
-    onGameStateChange?: (state: GameState) => void;
 };
 
-const PiczzleGame = forwardRef<GameActionsHandle, PiczzleGameProps>(({ 
-    imageSrcFromHome, 
-    isPreviewVisibleFromHome, 
-    onStatsChange, 
-    slug, 
-    imageFilename,
-    gridSizeFromHome,
-    onGameStateChange,
-}, ref) => {
-    const [gridSize, setGridSize] = useState(gridSizeFromHome || 3);
+export default function PiczzleGame({ imageSrcFromHome, isPreviewVisibleFromHome, onStatsChange, slug, imageFilename }: PiczzleGameProps) {
+    const [gridSize, setGridSize] = useState(3);
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
     const [pieces, setPieces] = useState<number[]>([]);
@@ -72,6 +61,7 @@ const PiczzleGame = forwardRef<GameActionsHandle, PiczzleGameProps>(({
     const [moves, setMoves] = useState(0);
     const { time, seconds: timeInSeconds, isActive, startTimer, pauseTimer, stopTimer, resetTimer } = useTimer();
     const { bestTime, updateBestTime } = useBestTime('slide', gridSize);
+    const [isClient, setIsClient] = useState(false);
     const [puzzleDimension, setPuzzleDimension] = useState({ width: 500, height: 500 });
     const [motivationalMessage, setMotivationalMessage] = useState("");
     const [gameState, setGameState] = useState<GameState>('initial');
@@ -95,17 +85,9 @@ const PiczzleGame = forwardRef<GameActionsHandle, PiczzleGameProps>(({
     }, [moves, time, onStatsChange]);
 
     useEffect(() => {
-        if(onGameStateChange) {
-            onGameStateChange(gameState);
-        }
-    }, [gameState, onGameStateChange]);
-    
-    useEffect(() => {
-        if (gridSizeFromHome !== undefined) {
-            setGridSize(gridSizeFromHome);
-        }
-    }, [gridSizeFromHome]);
-    
+      setIsClient(true);
+    }, []);
+
     useEffect(() => {
         if (isPreviewVisibleFromHome !== undefined) {
             setIsPreviewVisible(isPreviewVisibleFromHome);
@@ -194,24 +176,7 @@ const PiczzleGame = forwardRef<GameActionsHandle, PiczzleGameProps>(({
         stopTimer();
         setupPuzzle();
     }, [stopTimer, setupPuzzle]);
-    
-    const handlePause = useCallback(() => {
-        if (gameState === 'playing') {
-            pauseTimer();
-            setGameState('paused');
-        } else if (gameState === 'paused') {
-            startTimer();
-            setGameState('playing');
-        }
-    }, [gameState, pauseTimer, startTimer]);
 
-    useImperativeHandle(ref, () => ({
-        start: startGame,
-        stop: stopGame,
-        pause: handlePause,
-        restart: startGame,
-    }));
-    
     useEffect(() => {
       if (imageSrcFromHome) {
         const img = new Image();
@@ -300,6 +265,16 @@ const PiczzleGame = forwardRef<GameActionsHandle, PiczzleGameProps>(({
         }
     };
     
+    const handlePause = () => {
+        if (gameState === 'playing') {
+            pauseTimer();
+            setGameState('paused');
+        } else if (gameState === 'paused') {
+            startTimer();
+            setGameState('playing');
+        }
+    };
+
     const handleDialogClose = () => {
         setupPuzzle();
     }
@@ -322,7 +297,6 @@ const PiczzleGame = forwardRef<GameActionsHandle, PiczzleGameProps>(({
             <div
                 key={pieceValue}
                 onClick={() => handlePieceClick(index)}
-                onTouchStart={() => handlePieceClick(index)}
                 className="absolute border border-background/20 rounded-md shadow-md cursor-pointer transition-transform duration-300 ease-in-out hover:scale-105 hover:z-10"
                 style={{
                     width: pieceWidth,
@@ -339,47 +313,37 @@ const PiczzleGame = forwardRef<GameActionsHandle, PiczzleGameProps>(({
     }, [pieces, gridSize, imageSrc, pieceWidth, pieceHeight, puzzleDimension.width, puzzleDimension.height, gameState, emptyPiece, handlePieceClick]);
 
 
-    const handlePreviewMouseDown = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    const handlePreviewMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
         if (!previewRef.current || isResizingPreview) return;
-        
-        e.preventDefault(); // Prevent text selection etc.
         setIsDraggingPreview(true);
-        
-        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-
         const rect = previewRef.current.getBoundingClientRect();
         dragOffsetRef.current = {
-            x: clientX - rect.left,
-            y: clientY - rect.top,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
         };
         previewRef.current.style.transition = 'none';
+        e.preventDefault();
     };
 
-    const handlePreviewResizeMouseDown = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    const handlePreviewResizeMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
         e.stopPropagation();
-        e.preventDefault();
         setIsResizingPreview(true);
-        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
         resizeStartRef.current = {
-            x: clientX,
+            x: e.clientX,
             startWidth: previewRef.current?.offsetWidth || previewSize.width,
         };
+        e.preventDefault();
     };
 
-    const handlePreviewMouseMove = useCallback((e: MouseEvent | TouchEvent) => {
+    const handlePreviewMouseMove = useCallback((e: MouseEvent) => {
         if (!previewRef.current) return;
-        
-        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-        
         if (isDraggingPreview && puzzleContainerRef.current) {
             const parentRect = puzzleContainerRef.current.getBoundingClientRect();
-            previewRef.current.style.left = `${clientX - parentRect.left - dragOffsetRef.current.x}px`;
-            previewRef.current.style.top = `${clientY - parentRect.top - dragOffsetRef.current.y}px`;
+            previewRef.current.style.left = `${e.clientX - parentRect.left - dragOffsetRef.current.x}px`;
+            previewRef.current.style.top = `${e.clientY - parentRect.top - dragOffsetRef.current.y}px`;
 
         } else if (isResizingPreview) {
-            const dx = clientX - resizeStartRef.current.x;
+            const dx = e.clientX - resizeStartRef.current.x;
             const newWidth = resizeStartRef.current.startWidth + dx;
             previewRef.current.style.width = `${Math.max(100, newWidth)}px`;
         }
@@ -407,13 +371,9 @@ const PiczzleGame = forwardRef<GameActionsHandle, PiczzleGameProps>(({
     useEffect(() => {
         document.addEventListener('mousemove', handlePreviewMouseMove);
         document.addEventListener('mouseup', handlePreviewMouseUp);
-        document.addEventListener('touchmove', handlePreviewMouseMove);
-        document.addEventListener('touchend', handlePreviewMouseUp);
         return () => {
             document.removeEventListener('mousemove', handlePreviewMouseMove);
             document.removeEventListener('mouseup', handlePreviewMouseUp);
-            document.removeEventListener('touchmove', handlePreviewMouseMove);
-            document.removeEventListener('touchend', handlePreviewMouseUp);
         };
     }, [handlePreviewMouseMove, handlePreviewMouseUp]);
 
@@ -421,12 +381,13 @@ const PiczzleGame = forwardRef<GameActionsHandle, PiczzleGameProps>(({
 
     return (
         <div className="w-full h-full flex flex-col items-center justify-center p-4 sm:p-8">
+            {isClient &&
             <div className="w-full flex-grow flex flex-col lg:flex-row gap-8">
                 {showControls && (
                     <Card className="w-full lg:w-[380px] lg:flex-shrink-0 flex flex-col self-start">
                         <CardHeader>
-                            <CardTitle>Slide Puzzle</CardTitle>
-                            <CardDescription>Upload an image and start solving</CardDescription>
+                            <CardTitle>Controls</CardTitle>
+                            <CardDescription>Set up your puzzle</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6 flex-grow">
                             <div className="space-y-2">
@@ -487,14 +448,15 @@ const PiczzleGame = forwardRef<GameActionsHandle, PiczzleGameProps>(({
                                         Start Game
                                     </Button>
                                 ) : (
-                                    <div className='w-full grid grid-cols-2 gap-2'>
+                                    <div className='w-full grid grid-cols-3 gap-2'>
                                         <Button onClick={handlePause} variant="outline" size="lg" aria-label={gameState === 'paused' ? "Resume game" : "Pause game"}>
                                             {gameState === 'paused' ? <Play /> : <Pause />}
-                                            <span className="ml-2">{gameState === 'paused' ? "Resume" : "Pause"}</span>
                                         </Button>
                                         <Button onClick={stopGame} variant="destructive" size="lg" aria-label="Stop game">
                                             <XCircle />
-                                            <span className="ml-2">Stop</span>
+                                        </Button>
+                                        <Button onClick={startGame} size="lg" variant="secondary" aria-label="Restart game">
+                                            <RotateCcw />
                                         </Button>
                                     </div>
                                 )}
@@ -506,7 +468,7 @@ const PiczzleGame = forwardRef<GameActionsHandle, PiczzleGameProps>(({
 
                 <div className="w-full flex-grow flex flex-col items-center justify-center">
                     <div
-                        className="relative bg-muted/20 rounded-lg shadow-inner flex items-center justify-center w-full h-full min-h-[300px] md:min-h-[400px]"
+                        className="relative bg-muted/20 rounded-lg shadow-inner flex items-center justify-center w-full h-full min-h-[400px]"
                         ref={puzzleContainerRef}
                     >
                         {!imageSrc ? (
@@ -538,6 +500,38 @@ const PiczzleGame = forwardRef<GameActionsHandle, PiczzleGameProps>(({
                                         </Button>
                                     </div>
                                 }
+                                {imageSrcFromHome && 
+                                    <div className="absolute top-2 right-2 z-20 space-x-2">
+                                        {gameState === 'ready' || gameState === 'solved' || gameState === 'initial' ? (
+                                            <Button onClick={startGame} disabled={!imageSrc || gameState === 'playing'} size="lg">
+                                                <Play className="mr-2" />
+                                                Start
+                                            </Button>
+                                        ) : (
+                                            <>
+                                                <Button onClick={handlePause} variant="outline" size="icon" aria-label={gameState === 'paused' ? "Resume game" : "Pause game"}>
+                                                    {gameState === 'paused' ? <Play /> : <Pause />}
+                                                </Button>
+                                                <Button onClick={stopGame} variant="destructive" size="icon" aria-label="Stop game">
+                                                    <XCircle />
+                                                </Button>
+                                                <Button onClick={startGame} size="icon" variant="secondary" aria-label="Restart game">
+                                                    <RotateCcw />
+                                                </Button>
+                                            </>
+                                        )}
+                                         <Select value={String(gridSize)} onValueChange={(value) => setGridSize(Number(value))} disabled={gameState === 'playing' || gameState === 'paused'}>
+                                            <SelectTrigger className="w-[120px]">
+                                                <SelectValue placeholder="Difficulty" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {GRID_SIZES.map(size => (
+                                                    <SelectItem key={size} value={String(size)}>{size} x {size}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                }
                                 <div 
                                     className="relative"
                                     style={{ width: puzzleDimension.width, height: puzzleDimension.height }}
@@ -556,8 +550,7 @@ const PiczzleGame = forwardRef<GameActionsHandle, PiczzleGameProps>(({
                                     <div
                                         ref={previewRef}
                                         onMouseDown={handlePreviewMouseDown}
-                                        onTouchStart={handlePreviewMouseDown}
-                                        className="absolute z-50 p-1 bg-background/80 backdrop-blur-sm rounded-md shadow-lg flex flex-col border touch-none"
+                                        className="absolute z-50 p-1 bg-background/80 backdrop-blur-sm rounded-md shadow-lg flex flex-col border"
                                         style={{
                                             left: `${previewPos.x}px`,
                                             top: `${previewPos.y}px`,
@@ -572,7 +565,6 @@ const PiczzleGame = forwardRef<GameActionsHandle, PiczzleGameProps>(({
                                         </div>
                                         <div 
                                             onMouseDown={handlePreviewResizeMouseDown}
-                                            onTouchStart={handlePreviewResizeMouseDown}
                                             className="absolute -bottom-1 -right-1 cursor-se-resize p-2"
                                         >
                                             <CornerDownRight className="w-4 h-4 text-muted-foreground" />
@@ -584,6 +576,7 @@ const PiczzleGame = forwardRef<GameActionsHandle, PiczzleGameProps>(({
                     </div>
                 </div>
             </div>
+            }
 
             <Dialog open={gameState === 'solved'} onOpenChange={(open) => !open && handleDialogClose()}>
                 <DialogContent>
@@ -604,9 +597,6 @@ const PiczzleGame = forwardRef<GameActionsHandle, PiczzleGameProps>(({
                     )}
                     <DialogFooter className="sm:justify-center flex-col sm:flex-row gap-2">
                         <Button onClick={handleDialogClose} className="w-full sm:w-auto">Play Again</Button>
-                        <Button asChild variant="outline" className="w-full sm:w-auto">
-                           <Link href="/puzzles">More Puzzles</Link>
-                        </Button>
                         {slug && imageFilename &&
                           <ShareButton 
                             slug={slug}
@@ -624,6 +614,4 @@ const PiczzleGame = forwardRef<GameActionsHandle, PiczzleGameProps>(({
             </Dialog>
         </div>
     );
-});
-PiczzleGame.displayName = "PiczzleGame";
-export default PiczzleGame;
+}
